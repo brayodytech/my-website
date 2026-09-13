@@ -80,6 +80,36 @@
             border-radius: 10px;
         }
 
+         <!-- Customer Login -->
+<section class="login">
+    <h2>Customer Login</h2>
+
+    <form id="loginForm">
+        <input
+            type="email"
+            id="loginEmail"
+            placeholder="Your Email"
+            required
+        >
+
+        <input
+            type="password"
+            id="loginPassword"
+            placeholder="Your Password"
+            required
+        >
+
+        <button type="submit">Login</button>
+    </form>
+
+    <p id="loginMessage"></p>
+
+    <p>
+        Don't have an account?
+        <a href="#">Create an account</a>
+    </p>
+</section>
+
         .contact {
             background: #eeeeee;
         }
@@ -165,6 +195,32 @@
         <input type="email" placeholder="Your Email">
         <textarea placeholder="Your Message"></textarea>
     </section>
+<script>
+    const loginForm = document.getElementById("loginForm");
+    const loginMessage = document.getElementById("loginMessage");
 
+    loginForm.addEventListener("submit", async function(event) {
+        event.preventDefault();
+
+        const email = document.getElementById("loginEmail").value;
+        const password = document.getElementById("loginPassword").value;
+
+        loginMessage.textContent = "Logging in...";
+
+        const { data, error } = await supabaseClient.auth.signInWithPassword({
+            email: email,
+            password: password
+        });
+
+        if (error) {
+            loginMessage.textContent = "Login failed: " + error.message;
+            return;
+        }
+
+        loginMessage.textContent = "Login successful!";
+
+        console.log("Logged in user:", data.user);
+    });
+</script>
 </body>
 </html>
