@@ -7,7 +7,39 @@
     <title>My File Portal</title>
 
     <style>.login {
+    text-al.upload {
     text-align: center;
+    padding: 70px 20px;
+    background: #eeeeee;
+}
+
+.upload h2 {
+    font-size: 36px;
+}
+
+.upload input {
+    display: block;
+    margin: 25px auto;
+    font-size: 16px;
+}
+
+.upload button {
+    padding: 15px 30px;
+    background: #111;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 18px;
+    cursor: pointer;
+}
+
+.upload button:hover {
+    background: #00bfff;
+}
+
+#uploadMessage {
+    margin-top: 20px;
+}ign: center;
     padding: 70px 20px;
     background: white;
 }
@@ -258,6 +290,23 @@
 
     <p id="loginMessage"></p>
 
+</section><!-- File Upload -->
+<section class="upload">
+
+    <h2>Upload Your File</h2>
+
+    <p>Select a file to send to us.</p>
+
+    <input type="file" id="fileInput">
+
+    <button id="uploadButton">Upload File</button>
+
+    <p id="uploadMessage"></p>
+<h3>My Uploaded Files</h3>
+
+<div id="fileList">
+    <p>Loading files...</p>
+</div>
 </section>
     <!-- Contact -->
     <section class="contact">
@@ -290,9 +339,116 @@
         }
 
         loginMessage.textContent = "Login successful!";
+loginMessage.textContent = "Login successful!";
 
+loadMyFiles();
+
+console.log("Logged in user:", data.user);
         console.log("Logged in user:", data.user);
     });
-</script>
+</script><script>
+    const uploadButton = document.getElementById("uploadButton");
+    const fileInput = document.getElementById("fileInput");
+    const uploadMessage = document.getElementById("uploadMessage");
+
+    uploadButton.addEventListener("click", async function () {
+
+        const file = fileInput.files[0];
+
+        if (!file) {
+            uploadMessage.textContent = "Please choose a file first.";
+            return;
+        }
+
+        uploadMessage.textContent = "Uploading...";
+
+        // Get the currently logged-in customer
+        const { data: { user } } = await supabaseClient.auth.getUser();
+
+        if (!user) {
+            uploadMessage.textContent = "Please login first.";
+            return;
+        }
+
+        // Put the file inside the customer's own folder
+        const filePath = user.id + "/" + Date.now() + "_" + file.name;
+
+        const { error } = await supabaseClient.storage
+            .from("customer-files")
+            .upload(filePath, file);
+
+        if (error) {
+            uploadMessage.textContent = "Upload failed: " + error.message;
+            return;
+        }
+
+        uploadMessage.textContent = "File uploaded successfully! ✅";
+
+        fileInput.value = "";
+    });
+<script>
+    async function loadMyFiles() {
+
+        const fileList = document.getElementById("fileList");
+
+        fileList.innerHTML = "<p>Loading files...</p>";
+
+        // Get the logged-in customer
+        const { data: { user } } = await supabaseClient.auth.getUser();
+
+        if (!user) {
+            fileList.innerHTML = "<p>Please login first.</p>";
+            return;
+        }
+
+        // Get files from this customer's folder
+        const { data: files, error } = await supabaseClient.storage
+            .from("customer-files")
+            .list(user.id);
+
+        if (error) {
+            fileList.innerHTML = "<p>Could not load files: " + error.message + "</p>";
+            return;
+        }
+
+        if (!files || files.length === 0) {
+            fileList.innerHTML = "<p>You have not uploaded any files yet.</p>";
+            return;
+        }
+
+        fileList.innerHTML = "";
+
+        for (const file of files) {
+
+            const filePath = user.id + "/" + file.name;
+
+            const { data: signedUrlData, error: urlError } =
+                await supabaseClient.storage
+                    .from("customer-files")
+                    .createSignedUrl(filePath, 60 * 60);
+
+            if (urlError) {
+                console.error(urlError);
+                continue;
+            }
+
+            const fileItem = document.createElement("div");
+
+            fileItem.innerHTML = `
+                <p>
+                    📄 ${file.name}
+                    <a href="${signedUrlData.signedUrl}" target="_blank">
+                        Download
+                    </a>
+                </p>
+            `;
+
+            fileList.appendChild(fileItem);
+        }
+    }
+
+    // Load files when the page opens
+    loadMyFiles();
+</script></script>
 </body>
 </html>
