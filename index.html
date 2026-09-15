@@ -430,6 +430,10 @@
                     Login
                 </button>
 
+                <button id="signUpButton">
+                    Create Customer Account
+                </button>
+
                 <button
                     id="logoutButton"
                     style="display:none;"
@@ -510,7 +514,7 @@
             <h2>Contact</h2>
 
             <p>
-                Contact Brayody Tech 254769905150  for assistance.
+                Contact Brayody Tech for assistance.
             </p>
 
         </div>
@@ -855,6 +859,9 @@
         const loginButton =
             document.getElementById("loginButton");
 
+        const signUpButton =
+            document.getElementById("signUpButton");
+
         const logoutButton =
             document.getElementById("logoutButton");
 
@@ -936,6 +943,10 @@
                 "none";
 
 
+            signUpButton.style.display =
+                "none";
+
+
             logoutButton.style.display =
                 "inline-block";
 
@@ -945,6 +956,80 @@
 
 
             await loadMyFiles();
+
+        });
+
+
+        // ==============================
+        // CUSTOMER SIGN UP
+        // ==============================
+
+        signUpButton.addEventListener("click", async function () {
+
+            const email =
+                emailInput.value.trim();
+
+            const password =
+                passwordInput.value;
+
+            if (!email || !password) {
+
+                loginMessage.textContent =
+                    "Please enter an email and password to create your account.";
+
+                return;
+            }
+
+            if (password.length < 6) {
+
+                loginMessage.textContent =
+                    "Password must be at least 6 characters.";
+
+                return;
+            }
+
+            loginMessage.textContent =
+                "Creating your account...";
+
+            const { data, error } =
+                await supabaseClient.auth.signUp({
+                    email: email,
+                    password: password
+                });
+
+            if (error) {
+
+                loginMessage.textContent =
+                    "Account creation failed: " + error.message;
+
+                return;
+            }
+
+            if (data.session) {
+
+                loginMessage.textContent =
+                    "Account created successfully! ✅";
+
+                signUpButton.style.display =
+                    "none";
+
+                loginButton.style.display =
+                    "none";
+
+                logoutButton.style.display =
+                    "inline-block";
+
+                customerArea.style.display =
+                    "block";
+
+                await loadMyFiles();
+
+            } else {
+
+                loginMessage.textContent =
+                    "Account created! ✅ Please check your email to confirm your account, then log in.";
+
+            }
 
         });
 
@@ -963,6 +1048,10 @@
 
 
             loginButton.style.display =
+                "inline-block";
+
+
+            signUpButton.style.display =
                 "inline-block";
 
 
@@ -1064,6 +1153,7 @@
             uploadMessage.textContent =
                 "File uploaded successfully! ✅";
 
+            await loadMyFiles();
 
             fileInput.value = "";
 
