@@ -977,6 +977,9 @@
             fileList.innerHTML =
                 "<p>Login to see your files.</p>";
 
+            document.getElementById("totalFilesCount").textContent = "0";
+            document.getElementById("returnedFilesCount").textContent = "0";
+            document.getElementById("uploadedFilesCount").textContent = "0";
 
             emailInput.value = "";
 
@@ -1076,6 +1079,10 @@
 
         async function loadMyFiles() {
 
+            let totalFiles = 0;
+            let returnedFiles = 0;
+            let uploadedFiles = 0;
+
             const {
                 data: sessionData
             } = await supabaseClient.auth.getSession();
@@ -1130,6 +1137,10 @@
 
                 fileList.innerHTML =
                     "<p>No files found.</p>";
+
+                document.getElementById("totalFilesCount").textContent = "0";
+                document.getElementById("returnedFilesCount").textContent = "0";
+                document.getElementById("uploadedFilesCount").textContent = "0";
 
                 return;
             }
@@ -1234,6 +1245,10 @@
 
                 fileList.appendChild(fileItem);
             }
+
+            document.getElementById("totalFilesCount").textContent = totalFiles;
+            document.getElementById("returnedFilesCount").textContent = returnedFiles;
+            document.getElementById("uploadedFilesCount").textContent = uploadedFiles;
 
             if (returnedFileCount > 0) {
                 fileNotification.textContent =
