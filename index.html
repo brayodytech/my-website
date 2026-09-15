@@ -552,10 +552,14 @@
                         (customerEmails[customerId] || customerId) + " " + file.name
                     ).toLowerCase();
 
+                    const fileSize = formatFileSize(file.metadata?.size);
+                    const fileDate = formatFileDate(file.created_at || file.updated_at);
+
                     fileDiv.innerHTML = `
                         <strong>Customer:</strong> ${customerEmails[customerId] || customerId}<br>
                         <strong>File:</strong> ${file.name}<br>
-                        <strong>Size:</strong> ${file.metadata?.size || "Unknown"} bytes<br>
+                        <strong>Size:</strong> ${fileSize}<br>
+                        <strong>Date:</strong> ${fileDate}<br>
                         <br>
                         ${
                             signedUrlError
@@ -604,6 +608,47 @@
             } else {
                 adminFilesMessage.textContent = "No customer files found.";
             }
+        }
+
+
+        // ==============================
+        // FORMAT FILE SIZE AND DATE
+        // ==============================
+
+        function formatFileSize(bytes) {
+            if (bytes === undefined || bytes === null || isNaN(bytes)) {
+                return "Unknown";
+            }
+
+            bytes = Number(bytes);
+
+            if (bytes < 1024) {
+                return bytes + " bytes";
+            }
+
+            if (bytes < 1024 * 1024) {
+                return (bytes / 1024).toFixed(1) + " KB";
+            }
+
+            if (bytes < 1024 * 1024 * 1024) {
+                return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+            }
+
+            return (bytes / (1024 * 1024 * 1024)).toFixed(1) + " GB";
+        }
+
+        function formatFileDate(dateValue) {
+            if (!dateValue) {
+                return "Unknown";
+            }
+
+            const date = new Date(dateValue);
+
+            if (isNaN(date.getTime())) {
+                return "Unknown";
+            }
+
+            return date.toLocaleString();
         }
 
 
