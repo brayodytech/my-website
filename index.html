@@ -194,8 +194,67 @@
         </div>
     </section>
 
+<!-- ADMIN LOGIN -->
+<section id="adminLogin">
+    <div class="container">
 
-    <!-- CUSTOMER LOGIN -->
+        <h2>Admin Portal</h2>
+
+        <div class="card">
+
+            <input
+                type="email"
+                id="adminEmail"
+                placeholder="Admin email"
+            >
+
+            <input
+                type="password"
+                id="adminPassword"
+                placeholder="Admin password"
+            >
+
+            <button id="adminLoginButton">
+                Admin Login
+            </button>
+
+            <div
+                id="adminMessage"
+                class="message"
+            ></div>
+
+        </div>
+
+    </div>
+</section>
+  <!-- ADMIN AREA -->
+<section id="adminArea" style="display: none;">
+    <div class="container">
+        <h2>Admin File Management</h2>
+
+        <div class="card">
+            <h3>Customer Files</h3>
+
+            <h3>Send File Back to Customer</h3>
+
+            <select id="returnCustomerId" style="width: 100%; padding: 14px; margin: 10px 0; font-size: 16px;">
+                <option value="">Select customer</option>
+            </select>
+
+            <input type="file" id="returnFile">
+
+            <button id="sendFileButton">Send File to Customer</button>
+
+            <div id="sendFileMessage" class="message"></div>
+
+            <div id="adminFilesMessage" class="message"></div>
+
+            <div id="adminFilesList"></div>
+
+            <button id="adminLogoutButton">Admin Logout</button>
+        </div>
+    </div>
+</section>  <!-- CUSTOMER LOGIN -->
     <section id="login">
         <div class="container">
 
@@ -269,8 +328,9 @@
 
 
             <!-- MY FILES -->
-            <h2>My Uploaded Files</h2>
-
+            
+<h2>My Files</h2>
+<p>Files you uploaded and files sent back by Brayody Tech will appear here.</p>
             <div id="fileList">
                 <p>Login to see your files.</p>
             </div>
@@ -300,7 +360,6 @@
 
 
     <script>
-
         // ==============================
         // SUPABASE CONFIGURATION
         // ==============================
@@ -319,7 +378,221 @@
 
 
         // ==============================
-        // ELEMENTS
+        // ADMIN LOGIN
+        // ==============================
+
+        document.getElementById("adminLoginButton").addEventListener("click", async () => {
+
+            const email =
+                document.getElementById("adminEmail").value.trim();
+
+            const password =
+                document.getElementById("adminPassword").value;
+
+            const message =
+                document.getElementById("adminMessage");
+
+
+            if (!email || !password) {
+                message.textContent =
+                    "Please enter your admin email and password.";
+                return;
+            }
+
+
+            message.textContent =
+                "Logging in...";
+
+
+            const { data, error } =
+                await supabaseClient.auth.signInWithPassword({
+                    email: email,
+                    password: password
+                });
+
+
+            if (error) {
+                message.textContent =
+                    error.message;
+                return;
+            }
+
+
+            const user =
+                data.user;
+
+
+            if (user.app_metadata?.role !== "admin") {
+
+                await supabaseClient.auth.signOut();
+
+                message.textContent =
+                    "Access denied. Admin account required.";
+
+                return;
+            }
+
+
+            message.textContent =
+                "Admin login successful!";
+
+
+            document.getElementById("adminArea").style.display =
+                "block";
+
+
+            await loadAdminFiles();
+            await loadCustomersForAdmin();
+
+        });
+
+
+        // ==============================
+        // LOAD ADMIN FILES
+        // ==============================
+
+        async function loadAdminFiles() {
+            const adminFilesList = document.getElementById("adminFilesList");
+            const adminFilesMessage = document.getElementById("adminFilesMessage");
+
+            adminFilesList.innerHTML = "";
+            adminFilesMessage.textContent = "Loading customer files...";
+
+            const { data: folders, error: folderError } = await supabaseClient
+                .storage
+                .from("customer-files")
+                .list("", {
+                    limit: 100,
+                    sortBy: {
+                        column: "name",
+                        order: "asc"
+                    }
+                });
+
+            if (folderError) {
+                console.error(folderError);
+                adminFilesMessage.textContent = "Error loading customer folders.";
+                return;
+            }
+
+            if (!folders || folders.length === 0) {
+                adminFilesMessage.textContent = "No customer files found.";
+                return;
+            }
+
+            let foundFiles = false;
+
+            // Load the customer email list so the admin sees emails instead of UUIDs.
+            const { data: customers, error: customersError } =
+                await supabaseClient.rpc("get_customers");
+
+            if (customersError) {
+                console.error("CUSTOMER LIST ERROR:", customersError);
+            }
+
+            const customerEmails = {};
+            for (const customer of customers || []) {
+                customerEmails[customer.id] = customer.email;
+            }
+
+            for (const folder of folders) {
+                // In Supabase Storage, folders have no file id.
+                // Skip root-level files and keep the customer folders.
+                if (folder.id) {
+                    continue;
+                }
+
+                const customerId = folder.name;
+
+                const { data: files, error: fileError } = await supabaseClient
+                    .storage
+                    .from("customer-files")
+                    .list(customerId, {
+                        limit: 100,
+                        sortBy: {
+                            column: "name",
+                            order: "asc"
+                        }
+                    });
+
+                if (fileError) {
+                    console.error(fileError);
+                    continue;
+                }
+
+                if (!files || files.length === 0) {
+                    continue;
+                }
+
+                for (const file of files) {
+                    if (!file.id) {
+                        continue;
+                    }
+
+                    foundFiles = true;
+
+                    const filePath = customerId + "/" + file.name;
+
+                    const { data: signedUrlData, error: signedUrlError } =
+                        await supabaseClient
+                            .storage
+                            .from("customer-files")
+                            .createSignedUrl(filePath, 3600);
+
+                    const fileDiv = document.createElement("div");
+                    fileDiv.className = "card";
+
+                    fileDiv.innerHTML = `
+                        <strong>Customer:</strong> ${customerEmails[customerId] || customerId}<br>
+                        <strong>File:</strong> ${file.name}<br>
+                        <strong>Size:</strong> ${file.metadata?.size || "Unknown"} bytes<br>
+                        <br>
+                        ${
+                            signedUrlError
+                            ? "Download link unavailable"
+                            : `<a href="${signedUrlData.signedUrl}" target="_blank">
+                                <button>Download</button>
+                               </a>`
+                        }
+                    `;
+
+                    adminFilesList.appendChild(fileDiv);
+                }
+            }
+
+            if (foundFiles) {
+                adminFilesMessage.textContent = "Customer files loaded.";
+            } else {
+                adminFilesMessage.textContent = "No customer files found.";
+            }
+        }
+
+
+        // ==============================
+        // ADMIN LOGOUT
+        // ==============================
+
+        document.getElementById("adminLogoutButton").addEventListener("click", async () => {
+
+            await supabaseClient.auth.signOut();
+
+
+            document.getElementById("adminArea").style.display =
+                "none";
+
+
+            document.getElementById("adminMessage").textContent =
+                "Logged out.";
+
+
+            document.getElementById("adminFilesList").innerHTML =
+                "";
+
+        });
+
+
+        // ==============================
+        // CUSTOMER ELEMENTS
         // ==============================
 
         const loginButton =
@@ -354,7 +627,7 @@
 
 
         // ==============================
-        // LOGIN
+        // CUSTOMER LOGIN
         // ==============================
 
         loginButton.addEventListener("click", async function () {
@@ -365,6 +638,7 @@
             const password =
                 passwordInput.value;
 
+
             if (!email || !password) {
 
                 loginMessage.textContent =
@@ -372,6 +646,7 @@
 
                 return;
             }
+
 
             loginMessage.textContent =
                 "Logging in...";
@@ -400,6 +675,7 @@
             loginButton.style.display =
                 "none";
 
+
             logoutButton.style.display =
                 "inline-block";
 
@@ -408,49 +684,56 @@
                 "block";
 
 
-            // ONLY load files AFTER successful login
             await loadMyFiles();
 
         });
 
 
         // ==============================
-        // LOGOUT
+        // CUSTOMER LOGOUT
         // ==============================
 
         logoutButton.addEventListener("click", async function () {
 
             await supabaseClient.auth.signOut();
 
+
             loginMessage.textContent =
                 "You have been logged out.";
+
 
             loginButton.style.display =
                 "inline-block";
 
+
             logoutButton.style.display =
                 "none";
+
 
             customerArea.style.display =
                 "none";
 
+
             fileList.innerHTML =
                 "<p>Login to see your files.</p>";
 
+
             emailInput.value = "";
+
             passwordInput.value = "";
 
         });
 
 
         // ==============================
-        // UPLOAD FILE
+        // CUSTOMER FILE UPLOAD
         // ==============================
 
         uploadButton.addEventListener("click", async function () {
 
             uploadMessage.textContent =
                 "";
+
 
             const file =
                 fileInput.files[0];
@@ -465,10 +748,10 @@
             }
 
 
-            // Check login BEFORE uploading
             const {
                 data: sessionData
-            } = await supabaseClient.auth.getSession();
+            } =
+                await supabaseClient.auth.getSession();
 
 
             const user =
@@ -499,18 +782,17 @@
                 file.name;
 
 
-            const {
-                error
-            } = await supabaseClient.storage
-                .from("customer-files")
-                .upload(filePath, file);
+            const { error } =
+                await supabaseClient
+                    .storage
+                    .from("customer-files")
+                    .upload(filePath, file);
 
 
             if (error) {
 
                 uploadMessage.textContent =
-                    "Upload failed: " +
-                    error.message;
+                    "Upload failed: " + error.message;
 
                 return;
             }
@@ -534,22 +816,15 @@
 
         async function loadMyFiles() {
 
-            // First check if customer is logged in
             const {
                 data: sessionData
             } = await supabaseClient.auth.getSession();
 
+            const user = sessionData.session?.user;
 
-            const user =
-                sessionData.session?.user;
-
-
-            // VERY IMPORTANT:
-            // Do NOT show files if there is no login
             if (!user) {
 
-                customerArea.style.display =
-                    "none";
+                customerArea.style.display = "none";
 
                 fileList.innerHTML =
                     "<p>Login to see your files.</p>";
@@ -557,19 +832,16 @@
                 return;
             }
 
-
-            customerArea.style.display =
-                "block";
-
+            customerArea.style.display = "block";
 
             fileList.innerHTML =
                 "<p>Loading files...</p>";
 
-
             const {
                 data: files,
                 error
-            } = await supabaseClient.storage
+            } = await supabaseClient
+                .storage
                 .from("customer-files")
                 .list(user.id, {
                     limit: 100,
@@ -579,8 +851,9 @@
                     }
                 });
 
-
             if (error) {
+
+                console.error("FILE LIST ERROR:", error);
 
                 fileList.innerHTML =
                     "<p>Could not load files: " +
@@ -590,48 +863,36 @@
                 return;
             }
 
-
             if (!files || files.length === 0) {
 
                 fileList.innerHTML =
-                    "<p>No uploaded files yet.</p>";
+                    "<p>No files found.</p>";
 
                 return;
             }
 
-
             fileList.innerHTML = "";
-
 
             for (const file of files) {
 
-                const filePath =
-                    user.id +
-                    "/" +
-                    file.name;
+                // Ignore folders
+                if (!file.id) {
+                    continue;
+                }
 
+                const filePath =
+                    user.id + "/" + file.name;
 
                 const {
                     data: signedUrlData,
                     error: signedUrlError
-                } =
-                    await supabaseClient.storage
-                        .from("customer-files")
-                        .createSignedUrl(
-                            filePath,
-                            3600
-                        );
-
-
-                if (signedUrlError) {
-
-                    console.error(
-                        signedUrlError
+                } = await supabaseClient
+                    .storage
+                    .from("customer-files")
+                    .createSignedUrl(
+                        filePath,
+                        3600
                     );
-
-                    continue;
-                }
-
 
                 const fileItem =
                     document.createElement("div");
@@ -639,48 +900,65 @@
                 fileItem.className =
                     "file-item";
 
-
                 const fileName =
                     document.createElement("div");
 
                 fileName.className =
                     "file-name";
 
-                fileName.textContent =
+                if (file.name.startsWith("RETURNED_")) {
+
+    fileName.textContent =
+        "📥 From Brayody Tech: " +
+        file.name.replace(/^RETURNED_\d+_/, "");
+
+} else {
+
+    fileName.textContent =
+        "📤 You uploaded: " +
+        file.name;
+}
                     "📄 " + file.name;
 
+                fileItem.appendChild(fileName);
 
-                const downloadLink =
-                    document.createElement("a");
+                if (signedUrlError) {
 
-                downloadLink.className =
-                    "download-link";
+                    console.error(
+                        "SIGNED URL ERROR:",
+                        signedUrlError
+                    );
 
-                downloadLink.href =
-                    signedUrlData.signedUrl;
+                    const errorText =
+                        document.createElement("span");
 
-                downloadLink.target =
-                    "_blank";
+                    errorText.textContent =
+                        "Download unavailable";
 
-                downloadLink.textContent =
-                    "Download";
+                    fileItem.appendChild(errorText);
 
+                } else {
 
-                fileItem.appendChild(
-                    fileName
-                );
+                    const downloadLink =
+                        document.createElement("a");
 
-                fileItem.appendChild(
-                    downloadLink
-                );
+                    downloadLink.className =
+                        "download-link";
 
+                    downloadLink.href =
+                        signedUrlData.signedUrl;
 
-                fileList.appendChild(
-                    fileItem
-                );
+                    downloadLink.target =
+                        "_blank";
 
+                    downloadLink.textContent =
+                        "Download";
+
+                    fileItem.appendChild(downloadLink);
+                }
+
+                fileList.appendChild(fileItem);
             }
-
         }
 
 
@@ -692,7 +970,8 @@
 
             const {
                 data: sessionData
-            } = await supabaseClient.auth.getSession();
+            } =
+                await supabaseClient.auth.getSession();
 
 
             const user =
@@ -701,23 +980,37 @@
 
             if (user) {
 
-                loginButton.style.display =
-                    "none";
+                if (user.app_metadata?.role === "admin") {
 
-                logoutButton.style.display =
-                    "inline-block";
+                    document.getElementById("adminArea").style.display =
+                        "block";
 
-                loginMessage.textContent =
-                    "You are already logged in. ✅";
+                    document.getElementById("adminMessage").textContent =
+                        "You are already logged in as admin.";
 
-                customerArea.style.display =
-                    "block";
+                    await loadAdminFiles();
+                    await loadCustomersForAdmin();
 
-                await loadMyFiles();
+                } else {
+
+                    loginButton.style.display =
+                        "none";
+
+                    logoutButton.style.display =
+                        "inline-block";
+
+                    loginMessage.textContent =
+                        "You are already logged in. ✅";
+
+                    customerArea.style.display =
+                        "block";
+
+                    await loadMyFiles();
+
+                }
 
             } else {
 
-                // NOT LOGGED IN
                 loginButton.style.display =
                     "inline-block";
 
@@ -725,18 +1018,143 @@
                     "none";
 
                 customerArea.style.display =
+                    "none";
+
+                document.getElementById("adminArea").style.display =
                     "none";
 
                 fileList.innerHTML =
                     "<p>Login to see your files.</p>";
+
             }
 
         }
 
 
-        // Start by checking authentication
-        checkExistingLogin();
+        // ==============================
+        // LOAD CUSTOMERS FOR ADMIN
+        // ==============================
 
+        async function loadCustomersForAdmin() {
+
+            const customerSelect =
+                document.getElementById("returnCustomerId");
+
+            if (!customerSelect) {
+                return;
+            }
+
+            customerSelect.innerHTML =
+                '<option value="">Loading customers...</option>';
+
+            const { data: customers, error } =
+                await supabaseClient.rpc("get_customers");
+
+            if (error) {
+
+                console.error(
+                    "CUSTOMER LIST ERROR:",
+                    error
+                );
+
+                customerSelect.innerHTML =
+                    '<option value="">Could not load customers</option>';
+
+                return;
+            }
+
+            customerSelect.innerHTML =
+                '<option value="">Select customer</option>';
+
+            for (const customer of customers || []) {
+
+                const option =
+                    document.createElement("option");
+
+                option.value =
+                    customer.id;
+
+                option.textContent =
+                    customer.email;
+
+                customerSelect.appendChild(option);
+            }
+        }
+
+
+        // ==============================
+        // ADMIN SEND FILE TO CUSTOMER
+        // ==============================
+
+        document.getElementById("sendFileButton").addEventListener("click", async () => {
+
+            const customerId =
+                document.getElementById("returnCustomerId").value;
+
+            const fileInput =
+                document.getElementById("returnFile");
+
+            const message =
+                document.getElementById("sendFileMessage");
+
+            if (!customerId) {
+
+                message.textContent =
+                    "Please select a customer.";
+
+                return;
+            }
+
+            if (!fileInput.files || fileInput.files.length === 0) {
+
+                message.textContent =
+                    "Please choose a file.";
+
+                return;
+            }
+
+            const file =
+                fileInput.files[0];
+
+            message.textContent =
+                "Sending file...";
+
+            const filePath =
+                customerId +
+                "/RETURNED_" +
+                Date.now() +
+                "_" +
+                file.name;
+
+            const { error } =
+                await supabaseClient
+                    .storage
+                    .from("customer-files")
+                    .upload(filePath, file);
+
+            if (error) {
+
+                console.error(error);
+
+                message.textContent =
+                    "Error sending file: " +
+                    error.message;
+
+                return;
+            }
+
+            message.textContent =
+                "File sent successfully to the customer!";
+
+            fileInput.value = "";
+        });
+
+
+        // ==============================
+        // START
+        // ==============================
+
+        checkExistingLogin();
 
     </script>
 
