@@ -235,6 +235,13 @@
         <div class="card">
             <h3>Customer Files</h3>
 
+            <input
+                type="text"
+                id="adminFileSearch"
+                placeholder="Search by customer email or filename"
+                style="width: 100%; padding: 14px; margin: 10px 0; font-size: 16px;"
+            >
+
             <h3>Send File Back to Customer</h3>
 
             <select id="returnCustomerId" style="width: 100%; padding: 14px; margin: 10px 0; font-size: 16px;">
@@ -541,6 +548,9 @@
 
                     const fileDiv = document.createElement("div");
                     fileDiv.className = "card";
+                    fileDiv.dataset.searchText = (
+                        (customerEmails[customerId] || customerId) + " " + file.name
+                    ).toLowerCase();
 
                     fileDiv.innerHTML = `
                         <strong>Customer:</strong> ${customerEmails[customerId] || customerId}<br>
@@ -554,7 +564,36 @@
                                 <button>Download</button>
                                </a>`
                         }
+                        <button class="delete-file-button" type="button">Delete</button>
                     `;
+
+                    const deleteButton =
+                        fileDiv.querySelector(".delete-file-button");
+
+                    deleteButton.addEventListener("click", async () => {
+                        const confirmed =
+                            confirm("Are you sure you want to delete this file?");
+                        if (!confirmed) return;
+
+                        deleteButton.disabled = true;
+                        deleteButton.textContent = "Deleting...";
+
+                        const { error: deleteError } =
+                            await supabaseClient
+                                .storage
+                                .from("customer-files")
+                                .remove([filePath]);
+
+                        if (deleteError) {
+                            console.error(deleteError);
+                            deleteButton.disabled = false;
+                            deleteButton.textContent = "Delete";
+                            alert("Delete failed: " + deleteError.message);
+                            return;
+                        }
+
+                        fileDiv.remove();
+                    });
 
                     adminFilesList.appendChild(fileDiv);
                 }
@@ -566,6 +605,23 @@
                 adminFilesMessage.textContent = "No customer files found.";
             }
         }
+
+
+        // ==============================
+        // ADMIN FILE SEARCH
+        // ==============================
+
+        document.getElementById("adminFileSearch").addEventListener("input", function () {
+            const searchText = this.value.trim().toLowerCase();
+            const fileCards = document.querySelectorAll("#adminFilesList .card");
+
+            for (const card of fileCards) {
+                const matches = !searchText ||
+                    card.dataset.searchText.includes(searchText);
+
+                card.style.display = matches ? "" : "none";
+            }
+        });
 
 
         // ==============================
