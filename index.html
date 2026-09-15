@@ -129,6 +129,22 @@
             white-space: nowrap;
         }
 
+        .file-notification {
+            background: white;
+            max-width: 700px;
+            margin: 20px auto;
+            padding: 18px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            font-size: 18px;
+            font-weight: bold;
+            text-align: left;
+        }
+
+        .file-notification.hidden {
+            display: none;
+        }
+
         footer {
             background: #111;
             color: white;
@@ -338,6 +354,7 @@
             
 <h2>My Files</h2>
 <p>Files you uploaded and files sent back by Brayody Tech will appear here.</p>
+            <div id="fileNotification" class="file-notification hidden"></div>
             <div id="fileList">
                 <p>Login to see your files.</p>
             </div>
@@ -726,6 +743,9 @@
         const fileList =
             document.getElementById("fileList");
 
+        const fileNotification =
+            document.getElementById("fileNotification");
+
 
         // ==============================
         // CUSTOMER LOGIN
@@ -930,6 +950,9 @@
                 fileList.innerHTML =
                     "<p>Login to see your files.</p>";
 
+                fileNotification.classList.add("hidden");
+                fileNotification.textContent = "";
+
                 return;
             }
 
@@ -974,6 +997,8 @@
 
             fileList.innerHTML = "";
 
+            let returnedFileCount = 0;
+
             for (const file of files) {
 
                 // Ignore folders
@@ -1008,6 +1033,8 @@
                     "file-name";
 
                 if (file.name.startsWith("RETURNED_")) {
+
+    returnedFileCount++;
 
     fileName.textContent =
         "📥 From Brayody Tech: " +
@@ -1059,6 +1086,17 @@
                 }
 
                 fileList.appendChild(fileItem);
+            }
+
+            if (returnedFileCount > 0) {
+                fileNotification.textContent =
+                    returnedFileCount === 1
+                        ? "🔔 New file received from Brayody Tech!"
+                        : "🔔 " + returnedFileCount + " files received from Brayody Tech!";
+                fileNotification.classList.remove("hidden");
+            } else {
+                fileNotification.classList.add("hidden");
+                fileNotification.textContent = "";
             }
         }
 
