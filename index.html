@@ -233,6 +233,52 @@
             white-space: nowrap;
         }
 
+        .edit-instructions {
+            width: 100%;
+            min-height: 130px;
+            padding: 14px;
+            margin: 10px 0 14px;
+            font-size: 16px;
+            font-family: Arial, sans-serif;
+            line-height: 1.5;
+            resize: vertical;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+
+        .instructions-label {
+            display: block;
+            font-weight: bold;
+            font-size: 17px;
+            margin-top: 18px;
+            margin-bottom: 6px;
+        }
+
+        .file-instructions {
+            margin-top: 10px;
+            padding: 10px 12px;
+            background: #f7f7f7;
+            border-radius: 6px;
+            text-align: left;
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+
+        .admin-instructions {
+            margin-top: 10px;
+            padding: 12px;
+            background: #f7f7f7;
+            border-radius: 6px;
+            text-align: left;
+            line-height: 1.5;
+        }
+
+        .instruction-text {
+            margin-top: 6px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
         .file-section-title {
             max-width: 900px;
             margin: 0 auto 12px;
@@ -504,6 +550,15 @@
                     <button id="uploadButton">Upload File</button>
                 </div>
 
+                <label class="instructions-label" for="editInstructions">
+                    📝 How would you like this file edited?
+                </label>
+                <textarea
+                    id="editInstructions"
+                    class="edit-instructions"
+                    placeholder="Please describe exactly how you would like your file edited. For example: correct grammar, change the formatting, add citations, rewrite specific sections, etc."
+                ></textarea>
+
                 <div id="uploadMessage" class="message"></div>
             </div>
 
@@ -708,7 +763,7 @@
                 }
 
                 for (const file of files) {
-                    if (!file.id) {
+                    if (!file.id || file.name.endsWith("_INSTRUCTIONS.txt")) {
                         continue;
                     }
 
@@ -736,6 +791,11 @@
                         <strong>File:</strong> ${file.name}<br>
                         <strong>Size:</strong> ${fileSize}<br>
                         <strong>Date:</strong> ${fileDate}<br>
+                        <br>
+                        <div class="admin-instructions" data-instructions-for="${file.name}">
+                            <strong>📝 Editing instructions:</strong>
+                            <div class="instruction-text">Loading instructions...</div>
+                        </div>
                         <br>
                         ${
                             signedUrlError
@@ -774,6 +834,46 @@
 
                         fileDiv.remove();
                     });
+
+                    // Load and display the customer's editing instructions.
+                    if (!file.name.startsWith("RETURNED_")) {
+                        const baseMatch = file.name.match(/^(\d+)_/);
+
+                        if (baseMatch) {
+                            const instructionPath =
+                                customerId + "/" + baseMatch[1] + "_INSTRUCTIONS.txt";
+
+                            const { data: instructionData, error: instructionError } =
+                                await supabaseClient
+                                    .storage
+                                    .from("customer-files")
+                                    .download(instructionPath);
+
+                            const instructionTextElement =
+                                fileDiv.querySelector(".instruction-text");
+
+                            if (instructionTextElement) {
+                                if (!instructionError && instructionData) {
+                                    const instructionText =
+                                        await instructionData.text();
+
+                                    instructionTextElement.textContent =
+                                        instructionText.trim() ||
+                                        "No editing instructions provided.";
+                                } else {
+                                    instructionTextElement.textContent =
+                                        "No editing instructions provided.";
+                                }
+                            }
+                        }
+                    } else {
+                        const instructionBox =
+                            fileDiv.querySelector(".admin-instructions");
+
+                        if (instructionBox) {
+                            instructionBox.style.display = "none";
+                        }
+                    }
 
                     adminFilesList.appendChild(fileDiv);
                 }
@@ -896,8 +996,8 @@
         const fileInput =
             document.getElementById("fileInput");
 
-        const uploadButton =
-            document.getElementById("uploadButton");
+        const editInstructions =
+            document.getElementById("editInstructions");
 
         const uploadMessage =
             document.getElementById("uploadMessage");
@@ -1145,12 +1245,23 @@
                 "Uploading...";
 
 
+            const fileTimestamp = Date.now();
+
             const filePath =
                 user.id +
                 "/" +
-                Date.now() +
+                fileTimestamp +
                 "_" +
                 file.name;
+
+            const instructions =
+                editInstructions.value.trim();
+
+            const instructionsPath =
+                user.id +
+                "/" +
+                fileTimestamp +
+                "_INSTRUCTIONS.txt";
 
 
             const { error } =
@@ -1158,7 +1269,6 @@
                     .storage
                     .from("customer-files")
                     .upload(filePath, file);
-
 
             if (error) {
 
@@ -1260,8 +1370,8 @@
 
             for (const file of files) {
 
-                // Ignore folders
-                if (!file.id) {
+                // Ignore folders and internal instruction files.
+                if (!file.id || file.name.endsWith("_INSTRUCTIONS.txt")) {
                     continue;
                 }
 
@@ -1316,6 +1426,43 @@
                     "📄 " + file.name;
 
                 fileItem.appendChild(fileName);
+
+                // Show the editing instructions saved with this uploaded file.
+                if (!file.name.startsWith("RETURNED_")) {
+                    const baseMatch = file.name.match(/^(\d+)_/);
+
+                    if (baseMatch) {
+                        const instructionPath =
+                            user.id + "/" + baseMatch[1] + "_INSTRUCTIONS.txt";
+
+                        const { data: instructionData, error: instructionError } =
+                            await supabaseClient
+                                .storage
+                                .from("customer-files")
+                                .download(instructionPath);
+
+                        if (!instructionError && instructionData) {
+                            const instructionText =
+                                await instructionData.text();
+
+                            if (instructionText.trim()) {
+                                const instructionBox =
+                                    document.createElement("div");
+
+                                instructionBox.className = "file-instructions";
+                                instructionBox.innerHTML =
+                                    "<strong>📝 Editing instructions:</strong><br>" +
+                                    instructionText
+                                        .replace(/&/g, "&amp;")
+                                        .replace(/</g, "&lt;")
+                                        .replace(/>/g, "&gt;")
+                                        .replace(/\n/g, "<br>");
+
+                                fileItem.appendChild(instructionBox);
+                            }
+                        }
+                    }
+                }
 
                 if (signedUrlError) {
 
