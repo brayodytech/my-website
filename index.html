@@ -263,6 +263,52 @@
             box-shadow: 0 0 0 4px rgba(59, 91, 255, .14);
         }
 
+        .password-wrap {
+            position: relative;
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        .password-wrap input[type="password"],
+        .password-wrap input[type="text"] {
+            width: 100%;
+            margin: 0;
+            padding-right: 52px;
+        }
+
+        .password-toggle {
+            position: absolute;
+            top: 50%;
+            right: 10px;
+            transform: translateY(-50%);
+            width: 40px;
+            height: 40px;
+            margin: 0;
+            padding: 0;
+            border: 0;
+            border-radius: 10px;
+            background: transparent;
+            color: var(--muted);
+            box-shadow: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .password-toggle:hover {
+            background: rgba(59, 91, 255, .08);
+            color: var(--brand);
+            transform: translateY(-50%);
+            box-shadow: none;
+        }
+
+        .password-toggle svg {
+            width: 22px;
+            height: 22px;
+            pointer-events: none;
+        }
+
         input[type="file"] { padding: 11px; cursor: pointer; }
 
         input[type="file"]::file-selector-button {
@@ -565,11 +611,25 @@
                 placeholder="Admin email"
             >
 
-            <input
-                type="password"
-                id="adminPassword"
-                placeholder="Admin password"
-            >
+            <div class="password-wrap">
+                <input
+                    type="password"
+                    id="adminPassword"
+                    placeholder="Admin password"
+                >
+                <button
+                    type="button"
+                    class="password-toggle"
+                    id="adminPasswordToggle"
+                    aria-label="Show admin password"
+                    title="Show password"
+                >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"></path>
+                        <circle cx="12" cy="12" r="2.5"></circle>
+                    </svg>
+                </button>
+            </div>
 
             <button id="adminLoginButton">
                 Admin Login
@@ -632,11 +692,25 @@
                     placeholder="Email address"
                 >
 
-                <input
-                    type="password"
-                    id="password"
-                    placeholder="Password"
-                >
+                <div class="password-wrap">
+                    <input
+                        type="password"
+                        id="password"
+                        placeholder="Password"
+                    >
+                    <button
+                        type="button"
+                        class="password-toggle"
+                        id="passwordToggle"
+                        aria-label="Show password"
+                        title="Show password"
+                    >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"></path>
+                            <circle cx="12" cy="12" r="2.5"></circle>
+                        </svg>
+                    </button>
+                </div>
 
                 <button id="loginButton">
                     Login
@@ -764,6 +838,54 @@
                 SUPABASE_KEY
             );
 
+
+        // ==============================
+        // PASSWORD SHOW / HIDE
+        // ==============================
+
+        function setupPasswordToggle(inputId, toggleId) {
+            const passwordField = document.getElementById(inputId);
+            const toggleButton = document.getElementById(toggleId);
+
+            if (!passwordField || !toggleButton) return;
+
+            toggleButton.addEventListener("click", () => {
+                const isHidden = passwordField.type === "password";
+                passwordField.type = isHidden ? "text" : "password";
+
+                toggleButton.setAttribute(
+                    "aria-label",
+                    isHidden ? "Hide password" : "Show password"
+                );
+                toggleButton.setAttribute(
+                    "title",
+                    isHidden ? "Hide password" : "Show password"
+                );
+
+                toggleButton.innerHTML = isHidden
+                    ? `
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                             aria-hidden="true">
+                            <path d="M3 3l18 18"></path>
+                            <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"></path>
+                            <path d="M9.9 5.1A10.8 10.8 0 0 1 12 5c6.5 0 10 7 10 7a18.5 18.5 0 0 1-3.1 3.8"></path>
+                            <path d="M6.2 6.2C3.5 8.1 2 12 2 12s3.5 7 10 7c1.5 0 2.8-.3 4-.8"></path>
+                        </svg>
+                      `
+                    : `
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                             aria-hidden="true">
+                            <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"></path>
+                            <circle cx="12" cy="12" r="2.5"></circle>
+                        </svg>
+                      `;
+            });
+        }
+
+        setupPasswordToggle("adminPassword", "adminPasswordToggle");
+        setupPasswordToggle("password", "passwordToggle");
 
         // ==============================
         // ADMIN LOGIN
