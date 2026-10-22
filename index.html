@@ -521,6 +521,31 @@
 
         #customerArea .file-item { max-width: 900px; }
 
+        /* SEPARATED FILE GROUPS (sent / received) */
+        .file-group {
+            max-width: 900px;
+            margin: 28px auto;
+            padding: 22px 22px 10px;
+            border-radius: var(--radius);
+            border: 1px solid var(--line);
+            background: rgba(255, 255, 255, .62);
+            text-align: left;
+        }
+        .file-group-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .file-group-header h3 { margin: 0; font-size: 21px; }
+        .file-group-count {
+            min-width: 34px; padding: 4px 12px; border-radius: 999px;
+            font-weight: 800; font-size: 14px; text-align: center; color: #fff;
+            background: var(--mint);
+        }
+        .file-group-returned .file-group-count { background: var(--brand); }
+        .file-group-desc { margin: 6px 0 4px; color: var(--muted); font-size: 14px; }
+        .file-group-empty { margin: 14px 0; color: var(--muted); font-style: italic; }
+        .file-group .file-item { max-width: none; }
+        .file-group-uploaded .file-item, .file-group-uploaded .card { border-left: 5px solid var(--mint); }
+        .file-group-returned .file-item, .file-group-returned .card { border-left: 5px solid var(--brand); }
+        .file-group .card { max-width: none; margin: 14px 0; }
+
         @media (max-width: 700px) {
             .dashboard-grid { grid-template-columns: 1fr; }
             .dashboard-upload-row { flex-direction: column; align-items: stretch; }
@@ -706,7 +731,7 @@ body.view-customer #customerArea .container,body.view-admin #adminArea .containe
 
             <div id="adminFilesMessage" class="message"></div>
 
-            <div id="adminFilesList"></div>
+            <div id="adminFilesList" class="file-groups"></div>
 
             <button id="adminLogoutButton">Admin Logout</button>
         </div>
@@ -823,7 +848,7 @@ body.view-customer #customerArea .container,body.view-admin #adminArea .containe
 
             <div class="file-section-title">
                 <h3>📁 My Files</h3>
-                <p>Files you uploaded and files sent back by Brayody Tech will appear here.</p>
+                <p>Files from Brayody Tech and files you sent are shown in separate lists below.</p>
             </div>
 
             <div id="fileList">
@@ -1056,6 +1081,79 @@ body.view-customer #customerArea .container,body.view-admin #adminArea .containe
 
 
         // ==============================
+        // FILE GROUPS (keeps sent and received files apart)
+        // ==============================
+
+        function buildFileGroups(container, groups) {
+            container.innerHTML = "";
+            const sections = {};
+
+            for (const group of groups) {
+                const section = document.createElement("div");
+                section.className = "file-group file-group-" + group.key;
+                section.innerHTML = `
+                    <div class="file-group-header">
+                        <h3>${group.title}</h3>
+                        <span class="file-group-count">0</span>
+                    </div>
+                    <p class="file-group-desc">${group.desc}</p>
+                    <div class="file-group-list"></div>
+                    <p class="file-group-empty">${group.empty}</p>
+                `;
+                container.appendChild(section);
+                sections[group.key] = section;
+            }
+
+            return sections;
+        }
+
+        function refreshFileGroup(section) {
+            const count = section.querySelector(".file-group-list").children.length;
+            section.querySelector(".file-group-count").textContent = count;
+            section.querySelector(".file-group-empty").style.display = count ? "none" : "block";
+        }
+
+        function addToFileGroup(section, element) {
+            section.querySelector(".file-group-list").appendChild(element);
+            refreshFileGroup(section);
+        }
+
+        function cleanFileName(name) {
+            return name.replace(/^RETURNED_\d+_/, "").replace(/^\d+_/, "");
+        }
+
+        const ADMIN_FILE_GROUPS = [
+            {
+                key: "uploaded",
+                title: "📥 Files Received from Customers",
+                desc: "Files customers uploaded, with their editing instructions.",
+                empty: "No files received from customers yet."
+            },
+            {
+                key: "returned",
+                title: "📤 Files Sent Back to Customers",
+                desc: "Finished files you sent back to customers.",
+                empty: "No files sent back to customers yet."
+            }
+        ];
+
+        const CUSTOMER_FILE_GROUPS = [
+            {
+                key: "returned",
+                title: "📥 Files Received from Brayody Tech",
+                desc: "Finished files Brayody Tech sent back to you.",
+                empty: "No files from Brayody Tech yet."
+            },
+            {
+                key: "uploaded",
+                title: "📤 Files You Sent",
+                desc: "Files you uploaded to Brayody Tech, with your editing instructions.",
+                empty: "You haven't uploaded any files yet."
+            }
+        ];
+
+
+        // ==============================
         // LOAD ADMIN FILES
         // ==============================
 
@@ -1063,7 +1161,9 @@ body.view-customer #customerArea .container,body.view-admin #adminArea .containe
             const adminFilesList = document.getElementById("adminFilesList");
             const adminFilesMessage = document.getElementById("adminFilesMessage");
 
-            adminFilesList.innerHTML = "";
+            const adminGroups = buildFileGroups(adminFilesList, ADMIN_FILE_GROUPS);
+            refreshFileGroup(adminGroups.uploaded);
+            refreshFileGroup(adminGroups.returned);
             adminFilesMessage.textContent = "Loading customer files...";
 
             const { data: folders, error: folderError } = await supabaseClient
@@ -1158,7 +1258,7 @@ body.view-customer #customerArea .container,body.view-admin #adminArea .containe
 
                     fileDiv.innerHTML = `
                         <strong>Customer:</strong> ${customerEmails[customerId] || customerId}<br>
-                        <strong>File:</strong> ${file.name}<br>
+                        <strong>File:</strong> ${cleanFileName(file.name)}<br>
                         <strong>Size:</strong> ${fileSize}<br>
                         <strong>Date:</strong> ${fileDate}<br>
                         <br>
@@ -1202,7 +1302,9 @@ body.view-customer #customerArea .container,body.view-admin #adminArea .containe
                             return;
                         }
 
+                        const parentGroup = fileDiv.closest(".file-group");
                         fileDiv.remove();
+                        if (parentGroup) refreshFileGroup(parentGroup);
                     });
 
                     // Load and display the customer's editing instructions.
@@ -1245,7 +1347,10 @@ body.view-customer #customerArea .container,body.view-admin #adminArea .containe
                         }
                     }
 
-                    adminFilesList.appendChild(fileDiv);
+                    addToFileGroup(
+                        file.name.startsWith("RETURNED_") ? adminGroups.returned : adminGroups.uploaded,
+                        fileDiv
+                    );
                 }
             }
 
@@ -1775,8 +1880,12 @@ body.view-customer #customerArea .container,body.view-admin #adminArea .containe
 
             if (!files || files.length === 0) {
 
-                fileList.innerHTML =
-                    "<p>No files found.</p>";
+                const emptyGroups = buildFileGroups(fileList, CUSTOMER_FILE_GROUPS);
+                refreshFileGroup(emptyGroups.returned);
+                refreshFileGroup(emptyGroups.uploaded);
+
+                fileNotification.classList.add("hidden");
+                fileNotification.textContent = "";
 
                 document.getElementById("totalFilesCount").textContent = "0";
                 document.getElementById("returnedFilesCount").textContent = "0";
@@ -1785,7 +1894,9 @@ body.view-customer #customerArea .container,body.view-admin #adminArea .containe
                 return;
             }
 
-            fileList.innerHTML = "";
+            const customerGroups = buildFileGroups(fileList, CUSTOMER_FILE_GROUPS);
+            refreshFileGroup(customerGroups.returned);
+            refreshFileGroup(customerGroups.uploaded);
 
             let returnedFileCount = 0;
 
@@ -1835,14 +1946,12 @@ body.view-customer #customerArea .container,body.view-admin #adminArea .containe
     returnedFileCount++;
 
     fileName.textContent =
-        "📥 From Brayody Tech: " +
-        file.name.replace(/^RETURNED_\d+_/, "");
+        "📥 " + cleanFileName(file.name);
 
 } else {
 
     fileName.textContent =
-        "📤 You uploaded: " +
-        file.name;
+        "📤 " + cleanFileName(file.name);
 }
 
                 fileItem.appendChild(fileName);
@@ -1919,7 +2028,10 @@ body.view-customer #customerArea .container,body.view-admin #adminArea .containe
                     fileItem.appendChild(downloadLink);
                 }
 
-                fileList.appendChild(fileItem);
+                addToFileGroup(
+                    file.name.startsWith("RETURNED_") ? customerGroups.returned : customerGroups.uploaded,
+                    fileItem
+                );
             }
 
             document.getElementById("totalFilesCount").textContent = totalFiles;
@@ -2130,6 +2242,8 @@ body.view-customer #customerArea .container,body.view-admin #adminArea .containe
                 "File sent successfully to the customer!";
 
             fileInput.value = "";
+
+            await loadAdminFiles();
         });
 
 
